@@ -1,21 +1,22 @@
-const DATA_URL = "data/cards.json";
 const MAX_RESULTS = 40;
 const MIN_CHARS_FOR_FULL_LIST = 2;
+const LAST_GAME_KEY = "tcg-price-check:last-game";
 
 const els = {
+  gameTabs: document.getElementById("gameTabs"),
   search: document.getElementById("search"),
   setFilter: document.getElementById("setFilter"),
   status: document.getElementById("status"),
   results: document.getElementById("results"),
   metaInfo: document.getElementById("meta-info"),
-  template: document.getElementById("card-template"),
+  cardTemplate: document.getElementById("card-template"),
+  variantTemplate: document.getElementById("variant-template"),
 };
 
 let state = {
-  cards: [],
-  sets: [],
-  usdToSgd: null,
-  generatedAt: null,
+  games: [],          // manifest entries: {id, label, file, totalCards, generatedAt}
+  activeGameId: null,
+  gameData: {},        // cache of loaded per-game payloads, keyed by game id
 };
 
 function usd(n) {
@@ -28,29 +29,37 @@ function sgd(n) {
   return n.toLocaleString("en-SG", { style: "currency", currency: "SGD" });
 }
 
-function toSgd(usdAmount) {
-  if (usdAmount === null || usdAmount === undefined || !state.usdToSgd) return null;
-  return usdAmount * state.usdToSgd;
+function activeData() {
+  return state.gameData[state.activeGameId];
 }
 
-function fillPriceBlock(blockEl, priceData) {
-  const hasData = !!(priceData && priceData.market !== null && priceData.market !== undefined);
-  blockEl.classList.toggle("no-data", !hasData);
-  if (!hasData) return;
+function toSgd(usdAmount) {
+  const data = activeData();
+  if (usdAmount === null || usdAmount === undefined || !data || !data.usdToSgd) return null;
+  return usdAmount * data.usdToSgd;
+}
 
-  blockEl.querySelector(".market.usd").textContent = usd(priceData.market);
-  blockEl.querySelector(".market.sgd").textContent = `≈ ${sgd(toSgd(priceData.market))}`;
+function isFoilLike(variantName) {
+  return /foil/i.test(variantName);
+}
 
-  const rangeEl = blockEl.querySelector(".price-range");
-  const lowUsd = usd(priceData.low);
-  const highUsd = usd(priceData.high);
-  const lowSgd = sgd(toSgd(priceData.low));
-  const highSgd = sgd(toSgd(priceData.high));
-  rangeEl.innerHTML = `Range: ${lowUsd}–${highUsd}<br>≈ ${lowSgd}–${highSgd}`;
+function renderVariant(variant) {
+  const node = els.variantTemplate.content.cloneNode(true);
+  const block = node.querySelector(".price-block");
+  block.classList.toggle("foil", isFoilLike(variant.name));
+
+  node.querySelector(".variant-name").textContent = variant.name;
+  node.querySelector(".market.usd").textContent = usd(variant.market);
+  node.querySelector(".market.sgd").textContent = `≈ ${sgd(toSgd(variant.market))}`;
+
+  const rangeEl = node.querySelector(".price-range");
+  rangeEl.innerHTML = `Range: ${usd(variant.low)}–${usd(variant.high)}<br>≈ ${sgd(toSgd(variant.low))}–${sgd(toSgd(variant.high))}`;
+
+  return node;
 }
 
 function renderCard(card) {
-  const node = els.template.content.cloneNode(true);
+  const node = els.cardTemplate.content.cloneNode(true);
 
   const img = node.querySelector(".card-img");
   img.src = card.image || "";
@@ -62,8 +71,14 @@ function renderCard(card) {
   if (card.rarity) subParts.push(card.rarity);
   node.querySelector(".card-sub").textContent = subParts.join(" · ");
 
-  fillPriceBlock(node.querySelector(".price-block.normal"), card.normal);
-  fillPriceBlock(node.querySelector(".price-block.foil"), card.foil);
+  const grid = node.querySelector(".price-grid");
+  const hasVariants = card.variants && card.variants.length > 0;
+  node.querySelector(".no-listings-msg").style.display = hasVariants ? "none" : "block";
+  if (hasVariants) {
+    const frag = document.createDocumentFragment();
+    card.variants.forEach((v) => frag.appendChild(renderVariant(v)));
+    grid.appendChild(frag);
+  }
 
   const link = node.querySelector(".tcgp-link");
   if (card.url) {
@@ -94,10 +109,13 @@ function render(cards) {
 }
 
 function search() {
+  const data = activeData();
+  if (!data) return;
+
   const q = els.search.value.trim().toLowerCase();
   const setName = els.setFilter.value;
 
-  let pool = state.cards;
+  let pool = data.cards;
   if (setName) pool = pool.filter((c) => c.set === setName);
 
   if (!q) {
@@ -133,6 +151,7 @@ function debounce(fn, ms) {
 }
 
 function populateSetFilter(sets) {
+  els.setFilter.innerHTML = `<option value="">All sets</option>`;
   const frag = document.createDocumentFragment();
   for (const s of sets) {
     const opt = document.createElement("option");
@@ -144,37 +163,99 @@ function populateSetFilter(sets) {
 }
 
 function renderMeta() {
+  const data = activeData();
+  if (!data) {
+    els.metaInfo.textContent = "";
+    return;
+  }
   const parts = [];
-  if (state.generatedAt) {
-    const d = new Date(state.generatedAt);
+  if (data.generatedAt) {
+    const d = new Date(data.generatedAt);
     parts.push(`Prices updated ${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
   }
-  if (state.usdToSgd) {
-    parts.push(`1 USD ≈ ${state.usdToSgd.toFixed(4)} SGD`);
+  if (data.usdToSgd) {
+    parts.push(`1 USD ≈ ${data.usdToSgd.toFixed(4)} SGD`);
   }
   els.metaInfo.textContent = parts.join(" · ");
 }
 
-async function init() {
+function renderGameTabs() {
+  els.gameTabs.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (const game of state.games) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "game-tab";
+    btn.textContent = game.label;
+    btn.dataset.gameId = game.id;
+    btn.setAttribute("aria-pressed", String(game.id === state.activeGameId));
+    btn.addEventListener("click", () => selectGame(game.id));
+    frag.appendChild(btn);
+  }
+  els.gameTabs.appendChild(frag);
+}
+
+function updateActiveTabStyles() {
+  els.gameTabs.querySelectorAll(".game-tab").forEach((btn) => {
+    const isActive = btn.dataset.gameId === state.activeGameId;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+async function loadGameData(gameId) {
+  if (state.gameData[gameId]) return state.gameData[gameId];
+
+  const game = state.games.find((g) => g.id === gameId);
+  const res = await fetch(`data/${game.file}`, { cache: "no-cache" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  state.gameData[gameId] = data;
+  return data;
+}
+
+async function selectGame(gameId) {
+  state.activeGameId = gameId;
+  updateActiveTabStyles();
+  localStorage.setItem(LAST_GAME_KEY, gameId);
+
+  els.search.value = "";
+  els.results.innerHTML = "";
+  els.status.classList.remove("error");
   els.status.textContent = "Loading card prices…";
+
   try {
-    const res = await fetch(DATA_URL, { cache: "no-cache" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    state.cards = data.cards || [];
-    state.sets = data.sets || [];
-    state.usdToSgd = data.usdToSgd;
-    state.generatedAt = data.generatedAt;
-
-    populateSetFilter(state.sets);
+    const data = await loadGameData(gameId);
+    populateSetFilter(data.sets);
     renderMeta();
-
-    els.status.textContent = `${state.cards.length.toLocaleString()} cards loaded.`;
+    els.status.textContent = `${data.cards.length.toLocaleString()} cards loaded.`;
     els.results.innerHTML = `<p class="hint">Start typing a card name above…</p>`;
+    els.search.focus();
   } catch (err) {
     console.error(err);
     els.status.textContent = "Couldn't load price data. Check your connection and reload.";
+    els.status.classList.add("error");
+  }
+}
+
+async function init() {
+  els.status.textContent = "Loading…";
+  try {
+    const res = await fetch("data/games.json", { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const manifest = await res.json();
+    state.games = manifest.games || [];
+
+    if (state.games.length === 0) throw new Error("No games in manifest");
+
+    renderGameTabs();
+
+    const lastGame = localStorage.getItem(LAST_GAME_KEY);
+    const initialGame = state.games.find((g) => g.id === lastGame) ? lastGame : state.games[0].id;
+    await selectGame(initialGame);
+  } catch (err) {
+    console.error(err);
+    els.status.textContent = "Couldn't load game list. Check your connection and reload.";
     els.status.classList.add("error");
   }
 }

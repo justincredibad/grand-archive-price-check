@@ -1,11 +1,16 @@
-# Grand Archive Price Check
+# TCG Price Check
 
 A small, fast, offline-friendly card price checker built for vending at events.
-Type a card name, get **TCGplayer market prices for both Non-Foil and Foil**,
-shown in **USD and SGD**, with the low–high price range for each.
+Pick a game, type a card name, get **TCGplayer market prices for every
+printing** (Normal, Foil, Holofoil, Reverse Holofoil, 1st Edition, ...
+whatever actually exists for that card), shown in **USD and SGD**, with the
+low–high price range for each.
 
-Live data source: [Grand Archive TCG](https://www.gatcg.com/) on TCGplayer,
-category 74, mirrored for free (no scraping, no API key) by
+Currently covers:
+- [Grand Archive TCG](https://www.gatcg.com/) (TCGplayer category 74)
+- [Pokémon TCG](https://www.pokemon.com/us/pokemon-tcg) (TCGplayer category 3)
+
+Live data source for both: mirrored for free (no scraping, no API key) by
 [tcgcsv.com](https://tcgcsv.com/) — a public JSON/CSV mirror of TCGplayer's
 catalog and pricing API. Currency conversion uses the European Central Bank
 rate via [frankfurter.dev](https://frankfurter.dev/) (free, no key).
@@ -17,25 +22,31 @@ rate via [frankfurter.dev](https://frankfurter.dev/) (free, no key).
 
 ## How it works
 
-- `scripts/fetch-prices.mjs` pulls every Grand Archive set, every single card
-  (sealed product like booster boxes is excluded), and both the Normal and
-  Foil price (low/mid/high/market) for each, plus the current USD→SGD rate.
-  It writes everything to `data/cards.json` — one file, no backend, no
-  database.
+- `scripts/fetch-prices.mjs` loops over a small `GAMES` list (id, label,
+  TCGplayer category id), and for each game pulls every set, every single
+  card (sealed product like booster boxes is excluded), and every printing
+  TCGplayer actually lists a price for (low/mid/high/market), plus the
+  current USD→SGD rate. It writes one file per game — `data/grand-archive.json`,
+  `data/pokemon.json` — plus `data/games.json`, a small manifest the frontend
+  reads first to build the game picker without downloading any card data.
 - `.github/workflows/update-prices.yml` runs that script once a day
-  (04:00 UTC) on GitHub Actions and commits the refreshed `data/cards.json`
+  (04:00 UTC) on GitHub Actions and commits the refreshed data files
   automatically. You can also trigger it manually from the Actions tab.
-- `index.html` / `app.js` / `styles.css` are a static frontend that fetches
-  `data/cards.json` once and searches it entirely client-side — instant
-  results, no server round-trip per keystroke.
-- `sw.js` is a small service worker that caches the app and the price data,
-  so once you've loaded it at home, it keeps working at a venue with no wifi
-  (prices just won't refresh until you're back online).
+- `index.html` / `app.js` / `styles.css` are a static frontend. It loads
+  `data/games.json` first (tiny), renders the game tabs, then lazily fetches
+  only the selected game's file and searches it entirely client-side —
+  instant results, no server round-trip per keystroke. Your last-picked game
+  is remembered (`localStorage`) so it reopens where you left off.
+- `sw.js` is a small service worker that caches the app shell + `games.json`
+  on install, and caches each game's data file the first time you actually
+  open that game (not all of them up front — Pokémon's file alone is over
+  10MB). Once a game's been opened once online, it keeps working offline at
+  a venue with no wifi; prices just won't refresh until you're back online.
 
 ## Local development
 
 ```bash
-npm run fetch-prices   # regenerate data/cards.json from live TCGCSV data
+npm run fetch-prices   # regenerate data/*.json from live TCGCSV data
 npm run serve          # serve the site at http://localhost:8080
 ```
 
@@ -49,7 +60,7 @@ npm run serve          # serve the site at http://localhost:8080
    within a minute or two.
 5. **Settings → Actions → General → Workflow permissions**: make sure
    "Read and write permissions" is selected, so the daily price-update
-   workflow is allowed to commit `data/cards.json` back to the repo.
+   workflow is allowed to commit the refreshed data files back to the repo.
 
 That's it — no build step, no server to pay for or maintain.
 
@@ -70,19 +81,25 @@ git branch -M main
 git push -u origin main
 ```
 
-## Extending to other TCGs
+## Adding another game
 
-The category ID is the only game-specific bit. Change `CATEGORY_ID` at the
-top of `scripts/fetch-prices.mjs` to another TCGplayer category (e.g. Magic:
-The Gathering, Pokémon, One Piece — see `https://tcgcsv.com/tcgplayer/categories`
-for the full list) and everything else — the search UI, foil/non-foil
-split, USD/SGD conversion — works unchanged. Multi-game support (a game
-switcher in the UI) would be a natural next step if you want to price-check
-more than one TCG from the same site.
+Add one entry to the `GAMES` array at the top of `scripts/fetch-prices.mjs`:
+
+```js
+{ id: "one-piece", label: "One Piece Card Game", categoryId: 68 },
+```
+
+(Find category IDs at `https://tcgcsv.com/tcgplayer/categories`.) Run
+`npm run fetch-prices` and the new game's file + tab show up automatically —
+nothing else in the pipeline or UI is game-specific. Printing/variant names
+(Foil, Holofoil, 1st Edition, ...) are read directly from whatever TCGplayer
+calls them for that game, so no per-game UI work is needed either.
 
 ## Disclaimer
 
 Prices are TCGplayer *market* estimates mirrored daily, not live quotes —
 treat them as a pricing guide for vending, not a guarantee of what a card
 will sell for. Actual value depends on condition, seller reputation, and
-buyer demand on the day.
+buyer demand on the day. A card with no listed printings currently has no
+active TCGplayer sellers for it (common for ultra-rare/promo cards) — that's
+what the data says, not a bug in the fetch.

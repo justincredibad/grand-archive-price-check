@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Grand Archive Price Check</title>
-<meta name="description" content="Look up Grand Archive TCG card prices (foil &amp; non-foil, USD &amp; SGD) sourced from TCGplayer." />
+<title>TCG Price Check</title>
+<meta name="description" content="Look up trading card prices (every printing, USD &amp; SGD) sourced from TCGplayer." />
 <meta name="theme-color" content="#1a1530" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🃏</text></svg>" />
@@ -14,9 +14,11 @@
 <div class="app">
 
   <header class="topbar">
-    <h1>Grand Archive Price Check</h1>
+    <h1>TCG Price Check</h1>
     <p class="subtitle">Search a card to see TCGplayer market prices in USD &amp; SGD</p>
   </header>
+
+  <nav class="game-tabs" id="gameTabs" aria-label="Choose a game"></nav>
 
   <div class="search-wrap">
     <input
@@ -47,28 +49,21 @@
           <p class="card-sub"></p>
         </div>
       </div>
-      <div class="price-grid">
-        <div class="price-block normal">
-          <h3>Non-Foil</h3>
-          <div class="price-empty">No listings</div>
-          <div class="price-main">
-            <span class="market usd"></span>
-            <span class="market sgd"></span>
-          </div>
-          <div class="price-range"></div>
-        </div>
-        <div class="price-block foil">
-          <h3>Foil</h3>
-          <div class="price-empty">No listings</div>
-          <div class="price-main">
-            <span class="market usd"></span>
-            <span class="market sgd"></span>
-          </div>
-          <div class="price-range"></div>
-        </div>
-      </div>
+      <div class="price-grid"></div>
+      <p class="no-listings-msg">No current TCGplayer listings for this card.</p>
       <a class="tcgp-link" target="_blank" rel="noopener">View on TCGplayer ↗</a>
     </article>
+  </template>
+
+  <template id="variant-template">
+    <div class="price-block">
+      <h3 class="variant-name"></h3>
+      <div class="price-main">
+        <span class="market usd"></span>
+        <span class="market sgd"></span>
+      </div>
+      <div class="price-range"></div>
+    </div>
   </template>
 
   <footer class="footer">

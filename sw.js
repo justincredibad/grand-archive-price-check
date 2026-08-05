@@ -1,8 +1,12 @@
 // Lets the price checker keep working with no signal at a vending table —
 // caches the app shell and the price data on first load, then serves from
 // cache instantly while refreshing in the background when online.
-const CACHE_NAME = "ga-price-check-v1";
-const SHELL = ["./", "index.html", "styles.css", "app.js", "manifest.json", "data/cards.json"];
+const CACHE_NAME = "tcg-price-check-v2";
+// Only the shell + the small game manifest are precached on install. Each
+// game's card data (Pokemon alone is >10MB) is cached lazily the first time
+// it's actually requested, via the fetch handler's stale-while-revalidate
+// below — so picking one game doesn't force-download every game's data.
+const SHELL = ["./", "index.html", "styles.css", "app.js", "manifest.json", "data/games.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
