@@ -1,0 +1,11 @@
+{
+  "name": "grand-archive-price-check",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Static price checker for Grand Archive TCG cards, sourced from TCGplayer via tcgcsv.com.",
+  "scripts": {
+    "fetch-prices": "node scripts/fetch-prices.mjs",
+    "serve": "npx --yes http-server -c-1 ."
+  }
+}

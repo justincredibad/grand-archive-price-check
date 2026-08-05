@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Grand Archive Price Check</title>
+<meta name="description" content="Look up Grand Archive TCG card prices (foil &amp; non-foil, USD &amp; SGD) sourced from TCGplayer." />
+<meta name="theme-color" content="#1a1530" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🃏</text></svg>" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <h1>Grand Archive Price Check</h1>
+    <p class="subtitle">Search a card to see TCGplayer market prices in USD &amp; SGD</p>
+  </header>
+
+  <div class="search-wrap">
+    <input
+      id="search"
+      type="text"
+      inputmode="search"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      placeholder="Type a card name…"
+      aria-label="Search card name"
+    />
+    <select id="setFilter" aria-label="Filter by set">
+      <option value="">All sets</option>
+    </select>
+  </div>
+
+  <div id="status" class="status" role="status"></div>
+
+  <main id="results" class="results" aria-live="polite"></main>
+
+  <template id="card-template">
+    <article class="card">
+      <div class="card-head">
+        <img class="card-img" loading="lazy" alt="" />
+        <div class="card-meta">
+          <h2 class="card-name"></h2>
+          <p class="card-sub"></p>
+        </div>
+      </div>
+      <div class="price-grid">
+        <div class="price-block normal">
+          <h3>Non-Foil</h3>
+          <div class="price-empty">No listings</div>
+          <div class="price-main">
+            <span class="market usd"></span>
+            <span class="market sgd"></span>
+          </div>
+          <div class="price-range"></div>
+        </div>
+        <div class="price-block foil">
+          <h3>Foil</h3>
+          <div class="price-empty">No listings</div>
+          <div class="price-main">
+            <span class="market usd"></span>
+            <span class="market sgd"></span>
+          </div>
+          <div class="price-range"></div>
+        </div>
+      </div>
+      <a class="tcgp-link" target="_blank" rel="noopener">View on TCGplayer ↗</a>
+    </article>
+  </template>
+
+  <footer class="footer">
+    <p id="meta-info"></p>
+    <p class="disclaimer">Prices mirror TCGplayer market data via tcgcsv.com and are estimates only — actual sale prices vary by condition, seller, and demand.</p>
+  </footer>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

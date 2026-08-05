@@ -1,0 +1,240 @@
+:root {
+  color-scheme: dark;
+  --bg: #14101f;
+  --bg-elevated: #1e1830;
+  --bg-card: #241d3a;
+  --border: #372c54;
+  --text: #f2eefa;
+  --text-dim: #a89fc2;
+  --accent: #b98cff;
+  --accent-strong: #d6b8ff;
+  --foil-accent: #ffb84d;
+  --good: #7de3a3;
+  --radius: 14px;
+  font-size: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+  min-height: 100vh;
+}
+
+.topbar {
+  text-align: center;
+  padding: 12px 0 8px;
+}
+
+.topbar h1 {
+  font-size: 1.5rem;
+  margin: 0 0 4px;
+  background: linear-gradient(135deg, var(--accent-strong), var(--foil-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.search-wrap {
+  display: flex;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  padding: 12px 0;
+  z-index: 10;
+}
+
+#search {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 1.1rem;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+#search:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#setFilter {
+  flex: 0 0 auto;
+  max-width: 40%;
+  font-size: 0.9rem;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.status {
+  min-height: 1.4em;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  padding: 4px 2px 12px;
+}
+
+.status.error { color: #ff8a8a; }
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.card-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.card-img {
+  width: 56px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.card-meta { min-width: 0; }
+
+.card-name {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.card-sub {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.price-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.price-block {
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.price-block.foil {
+  border-color: #5a3f14;
+  background: linear-gradient(160deg, rgba(255, 184, 77, 0.12), var(--bg-elevated) 60%);
+}
+
+.price-block h3 {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.price-block.foil h3 { color: var(--foil-accent); }
+
+.price-main {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.price-main .market.usd {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--good);
+}
+
+.price-block.foil .market.usd { color: var(--foil-accent); }
+
+.price-main .market.sgd {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+}
+
+.price-range {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.price-empty {
+  display: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.price-block.no-data .price-main,
+.price-block.no-data .price-range {
+  display: none;
+}
+
+.price-block.no-data .price-empty {
+  display: block;
+}
+
+.tcgp-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.tcgp-link:hover { text-decoration: underline; }
+
+.footer {
+  margin-top: 32px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.hint {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 40px 16px;
+}
+
+@media (max-width: 380px) {
+  .price-grid { gap: 8px; }
+  .price-main .market.usd { font-size: 1.1rem; }
+}
