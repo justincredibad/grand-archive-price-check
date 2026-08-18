@@ -1,7 +1,7 @@
 // Lets the price checker keep working with no signal at a vending table —
 // caches the app shell and the price data on first load, then serves from
 // cache instantly while refreshing in the background when online.
-const CACHE_NAME = "tcg-price-check-v2";
+const CACHE_NAME = "tcg-price-check-v3";
 // Only the shell + the small game manifest are precached on install. Each
 // game's card data (Pokemon alone is >10MB) is cached lazily the first time
 // it's actually requested, via the fetch handler's stale-while-revalidate

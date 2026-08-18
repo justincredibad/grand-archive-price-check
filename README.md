@@ -4,7 +4,8 @@ A small, fast, offline-friendly card price checker built for vending at events.
 Pick a game, type a card name, get **TCGplayer market prices for every
 printing** (Normal, Foil, Holofoil, Reverse Holofoil, 1st Edition, ...
 whatever actually exists for that card), shown in **USD and SGD**, with the
-low–high price range for each.
+low–high price range for each and an optional **60-day price trend** per
+printing.
 
 Currently covers:
 - [Grand Archive TCG](https://www.gatcg.com/) (TCGplayer category 74)
@@ -25,23 +26,36 @@ rate via [frankfurter.dev](https://frankfurter.dev/) (free, no key).
 - `scripts/fetch-prices.mjs` loops over a small `GAMES` list (id, label,
   TCGplayer category id), and for each game pulls every set, every single
   card (sealed product like booster boxes is excluded), and every printing
-  TCGplayer actually lists a price for (low/mid/high/market), plus the
-  current USD→SGD rate. It writes one file per game — `data/grand-archive.json`,
+  TCGplayer lists a price for (low/mid/high/market — if `market` itself is
+  missing, which happens for low-volume printings, it falls back to
+  mid/high/low so the printing still shows up), plus the current USD→SGD
+  rate. It writes one file per game — `data/grand-archive.json`,
   `data/pokemon.json` — plus `data/games.json`, a small manifest the frontend
   reads first to build the game picker without downloading any card data.
+- The same script also maintains `data/<game>-history.json`: a compact
+  columnar file (`{dates: [...], series: {"productId:variantName": [prices,
+  aligned to dates]}}`) that it appends one column to every day it runs
+  (overwriting today's column if re-run same day), pruned to the last
+  `HISTORY_DAYS` (60) days so the file stays a bounded size instead of
+  growing forever. This is what powers the "Price history" trend line per
+  printing.
 - `.github/workflows/update-prices.yml` runs that script once a day
-  (04:00 UTC) on GitHub Actions and commits the refreshed data files
-  automatically. You can also trigger it manually from the Actions tab.
+  (04:00 UTC) on GitHub Actions and commits the refreshed data + history
+  files automatically. You can also trigger it manually from the Actions tab.
 - `index.html` / `app.js` / `styles.css` are a static frontend. It loads
   `data/games.json` first (tiny), renders the game tabs, then lazily fetches
   only the selected game's file and searches it entirely client-side —
   instant results, no server round-trip per keystroke. Your last-picked game
-  is remembered (`localStorage`) so it reopens where you left off.
+  is remembered (`localStorage`) so it reopens where you left off. Each
+  card's "📈 Price history" button lazily fetches that game's history file
+  (only once per session) and draws a small sparkline + % change per
+  printing from it.
 - `sw.js` is a small service worker that caches the app shell + `games.json`
-  on install, and caches each game's data file the first time you actually
-  open that game (not all of them up front — Pokémon's file alone is over
-  10MB). Once a game's been opened once online, it keeps working offline at
-  a venue with no wifi; prices just won't refresh until you're back online.
+  on install, and caches each game's data/history files the first time you
+  actually request them (not all of them up front — Pokémon's data file
+  alone is over 10MB). Once a game's been opened once online, it keeps
+  working offline at a venue with no wifi; prices just won't refresh until
+  you're back online.
 
 ## Local development
 

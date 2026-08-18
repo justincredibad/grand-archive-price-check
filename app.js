@@ -14,9 +14,10 @@ const els = {
 };
 
 let state = {
-  games: [],          // manifest entries: {id, label, file, totalCards, generatedAt}
+  games: [],          // manifest entries: {id, label, file, historyFile, totalCards, generatedAt}
   activeGameId: null,
   gameData: {},        // cache of loaded per-game payloads, keyed by game id
+  gameHistory: {},      // cache of loaded per-game price-history payloads, keyed by game id
 };
 
 function usd(n) {
@@ -49,8 +50,8 @@ function renderVariant(variant) {
   block.classList.toggle("foil", isFoilLike(variant.name));
 
   node.querySelector(".variant-name").textContent = variant.name;
-  node.querySelector(".market.usd").textContent = usd(variant.market);
-  node.querySelector(".market.sgd").textContent = `≈ ${sgd(toSgd(variant.market))}`;
+  node.querySelector(".market.usd").textContent = usd(variant.display);
+  node.querySelector(".market.sgd").textContent = `≈ ${sgd(toSgd(variant.display))}`;
 
   const rangeEl = node.querySelector(".price-range");
   rangeEl.innerHTML = `Range: ${usd(variant.low)}–${usd(variant.high)}<br>≈ ${sgd(toSgd(variant.low))}–${sgd(toSgd(variant.high))}`;
@@ -80,6 +81,15 @@ function renderCard(card) {
     grid.appendChild(frag);
   }
 
+  const historyToggle = node.querySelector(".history-toggle");
+  const historyPanel = node.querySelector(".history-panel");
+  if (hasVariants) {
+    historyToggle.addEventListener("click", () => toggleHistory(card, historyToggle, historyPanel));
+  } else {
+    historyToggle.remove();
+    historyPanel.remove();
+  }
+
   const link = node.querySelector(".tcgp-link");
   if (card.url) {
     link.href = card.url;
@@ -88,6 +98,131 @@ function renderCard(card) {
   }
 
   return node;
+}
+
+async function loadGameHistory(gameId) {
+  if (state.gameHistory[gameId]) return state.gameHistory[gameId];
+
+  const game = state.games.find((g) => g.id === gameId);
+  if (!game || !game.historyFile) return null;
+  const res = await fetch(`data/${game.historyFile}`, { cache: "no-cache" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  state.gameHistory[gameId] = data;
+  return data;
+}
+
+async function toggleHistory(card, btn, panel) {
+  if (!panel.hidden) {
+    panel.hidden = true;
+    btn.textContent = "📈 Price history";
+    return;
+  }
+
+  btn.textContent = "Loading…";
+  btn.disabled = true;
+  try {
+    const history = await loadGameHistory(state.activeGameId);
+    renderHistoryPanel(card, history, panel);
+    panel.hidden = false;
+    btn.textContent = "📉 Hide price history";
+  } catch (err) {
+    console.error(err);
+    panel.innerHTML = "";
+    panel.textContent = "Couldn't load price history.";
+    panel.hidden = false;
+    btn.textContent = "📈 Price history";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderHistoryPanel(card, history, panel) {
+  panel.innerHTML = "";
+  if (!history) {
+    panel.textContent = "Price history isn't available for this game yet.";
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  let any = false;
+  for (const variant of card.variants) {
+    const series = history.series[`${card.id}:${variant.name}`];
+    if (!series) continue;
+    const points = [];
+    series.forEach((v, i) => {
+      if (v !== null && v !== undefined) points.push({ i, v });
+    });
+    if (points.length < 2) continue;
+    any = true;
+    frag.appendChild(renderTrendRow(variant.name, points, history.dates.length));
+  }
+
+  if (!any) {
+    panel.textContent = "Not enough price history yet for this card — check back after a few daily updates.";
+    return;
+  }
+  panel.appendChild(frag);
+}
+
+function renderTrendRow(variantName, points, totalDays) {
+  const first = points[0].v;
+  const last = points[points.length - 1].v;
+  const changePct = first !== 0 ? ((last - first) / first) * 100 : 0;
+  const dir = last > first ? "up" : last < first ? "down" : "flat";
+  const arrow = dir === "up" ? "▲" : dir === "down" ? "▼" : "▬";
+
+  const row = document.createElement("div");
+  row.className = "trend-row";
+
+  const label = document.createElement("div");
+  label.className = "trend-label";
+
+  const name = document.createElement("span");
+  name.className = "trend-name";
+  name.textContent = variantName;
+
+  const change = document.createElement("span");
+  change.className = `trend-change ${dir}`;
+  change.textContent = `${arrow} ${changePct >= 0 ? "+" : ""}${changePct.toFixed(1)}% / ${totalDays}d`;
+
+  label.appendChild(name);
+  label.appendChild(change);
+  row.appendChild(label);
+  row.appendChild(buildSparkline(points, totalDays, dir));
+  return row;
+}
+
+function buildSparkline(points, totalDays, dir) {
+  const width = 110;
+  const height = 32;
+  const pad = 3;
+  const ys = points.map((p) => p.v);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const spanY = maxY - minY || 1;
+  const spanX = Math.max(totalDays - 1, 1);
+  const scaleX = (i) => pad + (i / spanX) * (width - pad * 2);
+  const scaleY = (v) => height - pad - ((v - minY) / spanY) * (height - pad * 2);
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", `sparkline ${dir}`);
+
+  const line = document.createElementNS(svgNS, "polyline");
+  line.setAttribute("points", points.map((p) => `${scaleX(p.i)},${scaleY(p.v)}`).join(" "));
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", "currentColor");
+  line.setAttribute("stroke-width", "1.5");
+  line.setAttribute("stroke-linecap", "round");
+  line.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(line);
+
+  return svg;
 }
 
 function render(cards) {
