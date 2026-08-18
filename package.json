@@ -6,6 +6,10 @@
   "description": "Static price checker for Grand Archive TCG cards, sourced from TCGplayer via tcgcsv.com.",
   "scripts": {
     "fetch-prices": "node scripts/fetch-prices.mjs",
+    "backfill-history": "node scripts/backfill-history.mjs",
     "serve": "npx --yes http-server -c-1 ."
+  },
+  "dependencies": {
+    "7zip-min": "^3.0.1"
   }
 }

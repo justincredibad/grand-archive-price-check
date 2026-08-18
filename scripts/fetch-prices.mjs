@@ -11,15 +11,23 @@
 //                                  Holofoil, 1st Edition, ...) with low/mid/high/
 //                                  market price. Sealed product (booster boxes,
 //                                  packs, etc.) is excluded.
-//   data/<game.id>-history.json — daily price history for the trend charts.
-//                                  Columnar: a shared `dates` array plus one
-//                                  array per "productId:variantName" series,
-//                                  aligned by index to `dates`. This script
-//                                  appends one column per day it runs (or
-//                                  overwrites today's column if re-run same
+//   data/<game.id>-history.json — daily price history for the trend charts,
+//                                  as actually shipped to the site. Columnar:
+//                                  a shared `dates` array plus one array per
+//                                  "productId:variantName" series, aligned by
+//                                  index to `dates`. Appends one column per
+//                                  day (or overwrites today's if re-run same
 //                                  day) and prunes anything older than
-//                                  HISTORY_DAYS, so the file grows to a
-//                                  bounded size instead of forever.
+//                                  REPO_HISTORY_DAYS, so this file — which
+//                                  gets committed and served over Pages —
+//                                  stays a bounded, reasonable download size.
+//
+// If EXTERNAL_HISTORY_DIR exists (a local-only folder, not part of the repo)
+// this script *also* maintains a second, unpruned copy of the same history
+// there — the full archive, going back as far as scripts/backfill-history.mjs
+// seeded it, kept off GitHub entirely so it doesn't bloat the repo with a
+// full-file rewrite every day. On CI (no such folder) that step is just
+// skipped and only the trimmed repo copy is maintained.
 //
 // A USD->SGD conversion rate is baked into every game file so the site works
 // fully offline after first load.
@@ -31,10 +39,15 @@ const GAMES = [
 
 const BASE = "https://tcgcsv.com/tcgplayer";
 const CONCURRENCY = 6;
-// How many daily columns to keep in each history file. Bigger = longer trend
-// lines but a bigger file to download; 60 days is ~2 months of context at a
-// modest size (only the "display" price is tracked per variant, not low/mid/high).
-const HISTORY_DAYS = 60;
+// How many daily columns the repo/site copy of history keeps. Bigger = longer
+// trend lines but a bigger file to download; 90 days is a solid multi-month
+// window at a modest size (only the "display" price is tracked per variant,
+// not low/mid/high, to keep the file smaller).
+const REPO_HISTORY_DAYS = 90;
+// Local-only full archive (not committed — see comment above). Change or
+// unset this if you're not on this machine/drive; the script just skips
+// external archiving if the path can't be created.
+const EXTERNAL_HISTORY_DIR = "E:\\Card price db";
 
 // Printings TCGplayer marks with "Foil" in the name get a shiny accent in
 // the UI; this also controls display order (plain printings first).
@@ -134,7 +147,7 @@ async function fetchGroupCards(categoryId, group) {
 // array of the same length (prices aligned by index to `dates`, null where
 // that printing had no price that day). Re-running the same day overwrites
 // today's column instead of adding a duplicate.
-function updateHistory(existing, cards, todayStr) {
+function updateHistory(existing, cards, todayStr, maxDays) {
   const dates = existing?.dates ? [...existing.dates] : [];
   const series = existing?.series ? structuredClone(existing.series) : {};
 
@@ -157,8 +170,8 @@ function updateHistory(existing, cards, todayStr) {
     while (series[key].length <= todayIndex) series[key].push(null);
   }
 
-  if (dates.length > HISTORY_DAYS) {
-    const drop = dates.length - HISTORY_DAYS;
+  if (maxDays && dates.length > maxDays) {
+    const drop = dates.length - maxDays;
     dates.splice(0, drop);
     for (const key of Object.keys(series)) {
       series[key].splice(0, drop);
@@ -232,6 +245,8 @@ async function main() {
     const file = `data/${game.id}.json`;
     await fs.writeFile(file, JSON.stringify(output));
 
+    const todayStr = output.generatedAt.slice(0, 10);
+
     const historyFile = `data/${game.id}-history.json`;
     let existingHistory = null;
     try {
@@ -239,10 +254,27 @@ async function main() {
     } catch {
       // No history yet (first run for this game) — start fresh.
     }
-    const todayStr = output.generatedAt.slice(0, 10);
-    const history = updateHistory(existingHistory, output.cards, todayStr);
+    const history = updateHistory(existingHistory, output.cards, todayStr, REPO_HISTORY_DAYS);
     await fs.writeFile(historyFile, JSON.stringify(history));
-    console.log(`${game.label}: history now spans ${history.dates.length} day(s)`);
+    console.log(`${game.label}: repo history now spans ${history.dates.length} day(s)`);
+
+    // Best-effort: also extend the full, unpruned local archive if it's
+    // reachable (it isn't on CI — that's fine, this just no-ops there).
+    try {
+      await fs.mkdir(EXTERNAL_HISTORY_DIR, { recursive: true });
+      const externalFile = `${EXTERNAL_HISTORY_DIR}\\${game.id}-history.json`;
+      let existingExternal = null;
+      try {
+        existingExternal = JSON.parse(await fs.readFile(externalFile, "utf8"));
+      } catch {
+        // No local archive yet for this game.
+      }
+      const fullHistory = updateHistory(existingExternal, output.cards, todayStr, null);
+      await fs.writeFile(externalFile, JSON.stringify(fullHistory));
+      console.log(`${game.label}: local full archive now spans ${fullHistory.dates.length} day(s) (${EXTERNAL_HISTORY_DIR})`);
+    } catch (err) {
+      console.log(`${game.label}: skipping local full archive (${EXTERNAL_HISTORY_DIR} not reachable: ${err.message})`);
+    }
 
     manifest.push({
       id: game.id,

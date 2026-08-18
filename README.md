@@ -4,8 +4,8 @@ A small, fast, offline-friendly card price checker built for vending at events.
 Pick a game, type a card name, get **TCGplayer market prices for every
 printing** (Normal, Foil, Holofoil, Reverse Holofoil, 1st Edition, ...
 whatever actually exists for that card), shown in **USD and SGD**, with the
-low–high price range for each and an optional **60-day price trend** per
-printing.
+low–high price range for each and an optional **90-day price trend** per
+printing, backed by real historical data back to 2024-02-08.
 
 Currently covers:
 - [Grand Archive TCG](https://www.gatcg.com/) (TCGplayer category 74)
@@ -36,10 +36,26 @@ rate via [frankfurter.dev](https://frankfurter.dev/) (free, no key).
   columnar file (`{dates: [...], series: {"productId:variantName": [prices,
   aligned to dates]}}`) that it appends one column to every day it runs
   (overwriting today's column if re-run same day), pruned to the last
-  `HISTORY_DAYS` (60) days so the file stays a bounded size instead of
-  growing forever. This is what powers the "Price history" trend line per
-  printing.
-- `.github/workflows/update-prices.yml` runs that script once a day
+  `REPO_HISTORY_DAYS` (90) days — this is the copy committed to the repo and
+  served by the site, kept deliberately small since it's a full-file rewrite
+  every day. This is what powers the "Price history" trend line per printing.
+- `scripts/backfill-history.mjs` is a one-off script (not part of the daily
+  job) that seeds real historical prices instead of only starting from
+  whenever `fetch-prices.mjs` first ran, by walking tcgcsv.com's daily
+  archive (`https://tcgcsv.com/archive/tcgplayer/prices-YYYY-MM-DD.ppmd.7z`,
+  available from 2024-02-08 onward). Run it with `npm run backfill-history
+  [-- --days=365]`.
+- Both scripts also maintain a **full, unpruned** copy of history at a
+  local-only folder (`EXTERNAL_HISTORY_DIR` in `fetch-prices.mjs`, currently
+  `E:\Card price db`) — this is *not* committed to git. A full year of
+  Pokémon history alone is around 90MB, and since it's one big rewritten
+  JSON blob, committing that daily would add ~90MB to the repo's history
+  *every day*. Keeping the full archive local and shipping only a 90-day
+  slice keeps the live site's history file (and the repo itself) a
+  reasonable size, while you still have the complete archive on disk. If
+  that folder isn't reachable (e.g. on GitHub's CI runners), both scripts
+  just skip that step and carry on — nothing breaks.
+- `.github/workflows/update-prices.yml` runs `fetch-prices.mjs` once a day
   (04:00 UTC) on GitHub Actions and commits the refreshed data + history
   files automatically. You can also trigger it manually from the Actions tab.
 - `index.html` / `app.js` / `styles.css` are a static frontend. It loads
