@@ -20,6 +20,11 @@
 
   <nav class="game-tabs" id="gameTabs" aria-label="Choose a game"></nav>
 
+  <div class="view-toggle" id="viewToggle" hidden>
+    <button type="button" class="view-btn active" data-view="search">🔍 Search</button>
+    <button type="button" class="view-btn" data-view="insights">📊 Insights</button>
+  </div>
+
   <div class="search-wrap">
     <input
       id="search"
@@ -39,6 +44,33 @@
   <div id="status" class="status" role="status"></div>
 
   <main id="results" class="results" aria-live="polite"></main>
+
+  <section id="insightsView" class="insights-view" hidden>
+    <p class="insights-intro">
+      Patterns in our own recorded Pokémon price history (species and
+      illustrator, cross-referenced via the
+      <a href="https://github.com/PokemonTCG/pokemon-tcg-data" target="_blank" rel="noopener">Pokémon TCG API</a>),
+      not a forecast — past movement, grouped, with sample sizes shown so
+      small groups don't masquerade as strong signals. Not purchase advice.
+    </p>
+    <div id="insightsSections"></div>
+  </section>
+
+  <template id="insights-section-template">
+    <div class="insights-section">
+      <h2 class="insights-heading"></h2>
+      <div class="insights-rows"></div>
+    </div>
+  </template>
+
+  <template id="insights-row-template">
+    <div class="insights-row">
+      <span class="insights-rank"></span>
+      <span class="insights-name"></span>
+      <span class="insights-metric"></span>
+      <span class="insights-sub"></span>
+    </div>
+  </template>
 
   <template id="card-template">
     <article class="card">

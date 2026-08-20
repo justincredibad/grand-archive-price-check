@@ -4,20 +4,33 @@ const LAST_GAME_KEY = "tcg-price-check:last-game";
 
 const els = {
   gameTabs: document.getElementById("gameTabs"),
+  viewToggle: document.getElementById("viewToggle"),
   search: document.getElementById("search"),
   setFilter: document.getElementById("setFilter"),
+  searchWrap: document.querySelector(".search-wrap"),
   status: document.getElementById("status"),
   results: document.getElementById("results"),
+  insightsView: document.getElementById("insightsView"),
+  insightsSections: document.getElementById("insightsSections"),
   metaInfo: document.getElementById("meta-info"),
   cardTemplate: document.getElementById("card-template"),
   variantTemplate: document.getElementById("variant-template"),
+  insightsSectionTemplate: document.getElementById("insights-section-template"),
+  insightsRowTemplate: document.getElementById("insights-row-template"),
 };
+
+// Games with an insights file available (currently just Pokemon — TCGCSV
+// itself carries no illustrator data for any game, this is built separately
+// per-game by cross-referencing a game-specific card database).
+const INSIGHTS_GAMES = { pokemon: "data/pokemon-insights.json" };
 
 let state = {
   games: [],          // manifest entries: {id, label, file, historyFile, totalCards, generatedAt}
   activeGameId: null,
+  activeView: "search", // "search" | "insights"
   gameData: {},        // cache of loaded per-game payloads, keyed by game id
   gameHistory: {},      // cache of loaded per-game price-history payloads, keyed by game id
+  insightsData: {},     // cache of loaded insights payloads, keyed by game id
 };
 
 function usd(n) {
@@ -354,6 +367,9 @@ async function selectGame(gameId) {
   updateActiveTabStyles();
   localStorage.setItem(LAST_GAME_KEY, gameId);
 
+  els.viewToggle.hidden = !INSIGHTS_GAMES[gameId];
+  setView("search");
+
   els.search.value = "";
   els.results.innerHTML = "";
   els.status.classList.remove("error");
@@ -370,6 +386,84 @@ async function selectGame(gameId) {
     console.error(err);
     els.status.textContent = "Couldn't load price data. Check your connection and reload.";
     els.status.classList.add("error");
+  }
+}
+
+function setView(view) {
+  state.activeView = view;
+  els.viewToggle.querySelectorAll(".view-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === view);
+  });
+
+  const showSearch = view === "search";
+  els.searchWrap.hidden = !showSearch;
+  els.status.hidden = !showSearch;
+  els.results.hidden = !showSearch;
+  els.insightsView.hidden = showSearch;
+
+  if (view === "insights") loadAndRenderInsights(state.activeGameId);
+}
+
+async function loadInsights(gameId) {
+  if (state.insightsData[gameId]) return state.insightsData[gameId];
+  const file = INSIGHTS_GAMES[gameId];
+  if (!file) return null;
+  const res = await fetch(file, { cache: "no-cache" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  state.insightsData[gameId] = data;
+  return data;
+}
+
+function insightsSection(heading, rows, formatMetric, formatSub) {
+  const node = els.insightsSectionTemplate.content.cloneNode(true);
+  node.querySelector(".insights-heading").textContent = heading;
+  const container = node.querySelector(".insights-rows");
+  if (rows.length === 0) {
+    container.innerHTML = `<p class="hint">Not enough data yet.</p>`;
+  } else {
+    const frag = document.createDocumentFragment();
+    rows.forEach((row, i) => {
+      const rowNode = els.insightsRowTemplate.content.cloneNode(true);
+      rowNode.querySelector(".insights-rank").textContent = `#${i + 1}`;
+      rowNode.querySelector(".insights-name").textContent = row.name;
+      rowNode.querySelector(".insights-metric").textContent = formatMetric(row);
+      rowNode.querySelector(".insights-sub").textContent = formatSub(row);
+      frag.appendChild(rowNode);
+    });
+    container.appendChild(frag);
+  }
+  return node;
+}
+
+async function loadAndRenderInsights(gameId) {
+  els.insightsSections.innerHTML = `<p class="hint">Loading insights…</p>`;
+  try {
+    const data = await loadInsights(gameId);
+    if (!data) {
+      els.insightsSections.innerHTML = `<p class="hint">Insights aren't available for this game.</p>`;
+      return;
+    }
+
+    els.insightsSections.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    const trendMetric = (r) => `${r.avgTrendPct >= 0 ? "+" : ""}${r.avgTrendPct}%`;
+    const priceMetric = (r) => usd(r.avgPrice);
+    const sub = (r) => `avg ${usd(r.avgPrice)} · n=${r.cardCount}`;
+
+    frag.appendChild(insightsSection("📈 Rising Species (90d)", data.speciesByTrend.slice(0, 15), trendMetric, sub));
+    frag.appendChild(insightsSection("💎 Premium Species (highest avg price)", data.speciesByPrice.slice(0, 15), priceMetric, (r) => `n=${r.cardCount}`));
+    frag.appendChild(insightsSection("🎨 Rising Illustrators (90d)", data.artistsByTrend.slice(0, 15), trendMetric, sub));
+    frag.appendChild(insightsSection("🎨 Premium Illustrators (highest avg price)", data.artistsByPrice.slice(0, 15), priceMetric, (r) => `n=${r.cardCount}`));
+    els.insightsSections.appendChild(frag);
+
+    const coverageNote = document.createElement("p");
+    coverageNote.className = "insights-coverage";
+    coverageNote.textContent = `Based on ${data.coverage.cardsMatched.toLocaleString()} of ${data.coverage.totalCards.toLocaleString()} cards matched to artist/species data, across a ${data.historyWindowDays}-day price history window. Updated ${new Date(data.generatedAt).toLocaleDateString()}.`;
+    els.insightsSections.appendChild(coverageNote);
+  } catch (err) {
+    console.error(err);
+    els.insightsSections.innerHTML = `<p class="hint">Couldn't load insights. Check your connection and reload.</p>`;
   }
 }
 
@@ -397,6 +491,9 @@ async function init() {
 
 els.search.addEventListener("input", debounce(search, 80));
 els.setFilter.addEventListener("change", search);
+els.viewToggle.querySelectorAll(".view-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setView(btn.dataset.view));
+});
 
 init();
 

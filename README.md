@@ -56,9 +56,33 @@ rate via [frankfurter.dev](https://frankfurter.dev/) (free, no key).
   reasonable size, while you still have the complete archive on disk. If
   that folder isn't reachable (e.g. on GitHub's CI runners), both scripts
   just skip that step and carry on — nothing breaks.
-- `.github/workflows/update-prices.yml` runs `fetch-prices.mjs` once a day
-  (04:00 UTC) on GitHub Actions and commits the refreshed data + history
-  files automatically. You can also trigger it manually from the Actions tab.
+- `scripts/build-pokemon-insights.mjs` (Pokémon-only) cross-references our
+  card catalog against the [Pokémon TCG API's bulk data
+  repo](https://github.com/PokemonTCG/pokemon-tcg-data) (free, MIT-licensed —
+  TCGCSV/TCGplayer's own product data has no illustrator field at all) to
+  attach an artist and species to each card, matching sets by TCGCSV's
+  `abbreviation` against the Pokémon TCG API's `ptcgoCode` (falling back to
+  fuzzy name matching), with a card-count sanity check to reject false
+  matches — TCGCSV reuses some set codes (e.g. a "BW Trainer Kit" spinoff
+  sharing the code the real 115-card "Black & White" set uses), which would
+  otherwise silently cross-wire two unrelated sets. It then joins that
+  against `pokemon-history.json` to compute a per-card price trend — using
+  the median of the first few and last few known prices rather than raw
+  endpoints, a $3 minimum starting price, and a ±400% plausibility cap,
+  because a low-volume printing can sit at a stale placeholder price (e.g.
+  $0.99) for months before a real trade corrects it, which isn't a genuine
+  "rise". The result — species and illustrators ranked by average recent
+  trend and by average price, with sample sizes — is written to
+  `data/pokemon-insights.json` and shown under the "📊 Insights" toggle when
+  Pokémon is selected. It's descriptive (what already happened in our
+  recorded prices), not a forecast, and illustrator/rarity are correlated
+  (chase "alt art" slots go disproportionately to a handful of artists), so
+  it isn't a clean causal signal either — treat it as a discovery tool, not
+  purchase advice.
+- `.github/workflows/update-prices.yml` runs `fetch-prices.mjs` then
+  `build-pokemon-insights.mjs` once a day (04:00 UTC) on GitHub Actions and
+  commits the refreshed data + history + insights files automatically. You
+  can also trigger it manually from the Actions tab.
 - `index.html` / `app.js` / `styles.css` are a static frontend. It loads
   `data/games.json` first (tiny), renders the game tabs, then lazily fetches
   only the selected game's file and searches it entirely client-side —

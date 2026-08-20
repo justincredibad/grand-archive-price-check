@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - "scripts/fetch-prices.mjs"
+      - "scripts/build-pokemon-insights.mjs"
       - ".github/workflows/update-prices.yml"
 
 permissions:
@@ -30,6 +31,9 @@ jobs:
 
       - name: Fetch latest card prices
         run: node scripts/fetch-prices.mjs
+
+      - name: Build Pokemon price-pattern insights
+        run: node scripts/build-pokemon-insights.mjs
 
       - name: Commit updated data
         run: |
