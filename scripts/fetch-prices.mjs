@@ -35,6 +35,7 @@
 const GAMES = [
   { id: "grand-archive", label: "Grand Archive TCG", categoryId: 74 },
   { id: "pokemon", label: "Pokémon TCG", categoryId: 3 },
+  { id: "riftbound", label: "Riftbound TCG", categoryId: 89 },
 ];
 
 const BASE = "https://tcgcsv.com/tcgplayer";

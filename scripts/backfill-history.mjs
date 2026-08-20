@@ -30,6 +30,7 @@ import seven from "7zip-min";
 const GAMES = [
   { id: "grand-archive", categoryId: 74 },
   { id: "pokemon", categoryId: 3 },
+  { id: "riftbound", categoryId: 89 },
 ];
 
 const ARCHIVE_BASE = "https://tcgcsv.com/archive/tcgplayer";
@@ -121,7 +122,7 @@ async function main() {
   }
   const dates = [...pastDates, todayStr];
 
-  const seriesByGame = { "grand-archive": {}, pokemon: {} };
+  const seriesByGame = Object.fromEntries(GAMES.map((g) => [g.id, {}]));
 
   let ok = 0;
   let missing = 0;

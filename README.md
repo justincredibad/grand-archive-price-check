@@ -10,8 +10,9 @@ printing, backed by real historical data back to 2024-02-08.
 Currently covers:
 - [Grand Archive TCG](https://www.gatcg.com/) (TCGplayer category 74)
 - [Pokémon TCG](https://www.pokemon.com/us/pokemon-tcg) (TCGplayer category 3)
+- [Riftbound: League of Legends TCG](https://riftbound.leagueoflegends.com/) (TCGplayer category 89)
 
-Live data source for both: mirrored for free (no scraping, no API key) by
+Live data source for all three: mirrored for free (no scraping, no API key) by
 [tcgcsv.com](https://tcgcsv.com/) — a public JSON/CSV mirror of TCGplayer's
 catalog and pricing API. Currency conversion uses the European Central Bank
 rate via [frankfurter.dev](https://frankfurter.dev/) (free, no key).
